@@ -33,6 +33,12 @@ int GameLoop::run(const std::filesystem::path& mapPath)
         }
 
         session.update(deltaSeconds, input);
+        if (session.shotFiredThisFrame()) {
+            app.triggerBulletTrail();
+        }
+        if (session.damageDealtThisFrame() > 0) {
+            app.triggerDamageNumber(session.damageDealtThisFrame());
+        }
         app.render(session.world(), session.localPlayerId());
     }
 
@@ -40,4 +46,3 @@ int GameLoop::run(const std::filesystem::path& mapPath)
 }
 
 }  // namespace doomlike::application
-

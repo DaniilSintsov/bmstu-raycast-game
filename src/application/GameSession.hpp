@@ -17,6 +17,8 @@ public:
     [[nodiscard]] const domain::World& world() const noexcept;
     [[nodiscard]] domain::World& world() noexcept;
     [[nodiscard]] domain::PlayerId localPlayerId() const noexcept;
+    [[nodiscard]] bool shotFiredThisFrame() const noexcept;
+    [[nodiscard]] int damageDealtThisFrame() const noexcept;
 
 private:
     void updateMovement(float deltaSeconds, const InputState& input);
@@ -28,7 +30,8 @@ private:
     domain::PlayerId localPlayerId_ {domain::PlayerId::Host};
     float moveSpeed_ {2.8F};
     float rotationSpeed_ {1.9F};
+    bool shotFiredThisFrame_ {false};
+    int damageDealtThisFrame_ {0};
 };
 
 }  // namespace doomlike::application
-

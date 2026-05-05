@@ -34,6 +34,8 @@ void GameSession::restart()
 
 void GameSession::update(const float deltaSeconds, const InputState& input)
 {
+    shotFiredThisFrame_ = false;
+    damageDealtThisFrame_ = 0;
     updateWeaponCooldown(deltaSeconds);
 
     if (world_.phase() == domain::MatchPhase::GameOver || world_.phase() == domain::MatchPhase::OpponentDisconnected) {
@@ -69,6 +71,16 @@ domain::World& GameSession::world() noexcept
 domain::PlayerId GameSession::localPlayerId() const noexcept
 {
     return localPlayerId_;
+}
+
+bool GameSession::shotFiredThisFrame() const noexcept
+{
+    return shotFiredThisFrame_;
+}
+
+int GameSession::damageDealtThisFrame() const noexcept
+{
+    return damageDealtThisFrame_;
 }
 
 void GameSession::updateMovement(const float deltaSeconds, const InputState& input)
@@ -125,9 +137,11 @@ void GameSession::handleShoot()
     }
 
     shooter.weapon.cooldownRemaining = shooter.weapon.cooldownSeconds;
+    shotFiredThisFrame_ = true;
 
     if (const auto result = domain::ShootingSystem::fireHitscan(world_, localPlayerId_)) {
-        domain::DamageSystem::applyDamage(world_, result->target, shooter.weapon.damage);
+        damageDealtThisFrame_ = shooter.weapon.damage;
+        domain::DamageSystem::applyDamage(world_, result->target, damageDealtThisFrame_);
     }
 }
 
