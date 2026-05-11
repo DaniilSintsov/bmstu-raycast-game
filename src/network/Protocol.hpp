@@ -28,6 +28,7 @@ enum class InputFlags : std::uint8_t {
     TurnLeft = 1 << 4,
     TurnRight = 1 << 5,
     Shoot = 1 << 6,
+    Restart = 1 << 7,
 };
 
 inline constexpr std::uint8_t toMask(const InputFlags value) noexcept

@@ -101,6 +101,7 @@ bool EnetClient::sendBytes(const std::span<const std::byte> bytes, const bool re
         return false;
     }
 
+    enet_host_flush(host_);
     return true;
 }
 

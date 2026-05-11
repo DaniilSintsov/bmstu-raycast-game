@@ -11,8 +11,11 @@ class GameSession {
 public:
     bool loadMap(const std::filesystem::path& mapPath);
     void startOfflineDemo();
+    void startWaitingForPlayers();
     void restart();
+    void setLocalPlayerId(domain::PlayerId playerId) noexcept;
     void update(float deltaSeconds, const InputState& input);
+    void updateAuthoritative(float deltaSeconds, const InputState& hostInput, const InputState& clientInput);
 
     [[nodiscard]] const domain::World& world() const noexcept;
     [[nodiscard]] domain::World& world() noexcept;
@@ -21,9 +24,9 @@ public:
     [[nodiscard]] int damageDealtThisFrame() const noexcept;
 
 private:
-    void updateMovement(float deltaSeconds, const InputState& input);
+    void updateMovement(float deltaSeconds, domain::PlayerId playerId, const InputState& input);
     void updateWeaponCooldown(float deltaSeconds);
-    void handleShoot();
+    void handleShoot(domain::PlayerId shooterId);
 
     domain::World world_ {};
     std::filesystem::path loadedMapPath_ {};

@@ -4,7 +4,10 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <utility>
 
 namespace doomlike::presentation {
 
@@ -183,6 +186,117 @@ bool SdlApp::isRunning() const noexcept
     return running_;
 }
 
+void SdlApp::setHudModeLabel(std::string label)
+{
+    hudModeLabel_ = std::move(label);
+}
+
+std::optional<application::LaunchOptions> SdlApp::runStartupMenu()
+{
+    std::string hostIp {};
+    bool editingIp = false;
+    bool textInputActive = false;
+
+    const auto setTextInput = [&](const bool active) {
+        if (window_ == nullptr || textInputActive == active) {
+            return;
+        }
+
+        if (active) {
+            SDL_StartTextInput(window_);
+        } else {
+            SDL_StopTextInput(window_);
+        }
+        textInputActive = active;
+    };
+
+    while (running_) {
+        SDL_Event event {};
+        while (SDL_PollEvent(&event)) {
+            if (renderer_ != nullptr) {
+                SDL_ConvertEventToRenderCoordinates(renderer_, &event);
+            }
+
+            switch (event.type) {
+                case SDL_EVENT_QUIT:
+                    running_ = false;
+                    setTextInput(false);
+                    return std::nullopt;
+
+                case SDL_EVENT_TEXT_INPUT:
+                    if (editingIp && event.text.text != nullptr) {
+                        const std::string_view text(event.text.text);
+                        for (const char ch : text) {
+                            const bool allowed =
+                                (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') ||
+                                (ch >= 'A' && ch <= 'Z') || ch == '.' || ch == '-' || ch == ':';
+                            if (allowed && hostIp.size() < 63) {
+                                hostIp.push_back(ch);
+                            }
+                        }
+                    }
+                    break;
+
+                case SDL_EVENT_KEY_DOWN:
+                    if (event.key.repeat) {
+                        break;
+                    }
+
+                    if (editingIp) {
+                        if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
+                            editingIp = false;
+                            setTextInput(false);
+                            break;
+                        }
+                        if (event.key.scancode == SDL_SCANCODE_BACKSPACE && !hostIp.empty()) {
+                            hostIp.pop_back();
+                            break;
+                        }
+                        if ((event.key.scancode == SDL_SCANCODE_RETURN ||
+                             event.key.scancode == SDL_SCANCODE_KP_ENTER) &&
+                            !hostIp.empty()) {
+                            setTextInput(false);
+                            return application::LaunchOptions {
+                                .mode = application::GameMode::MultiplayerClient,
+                                .hostIp = hostIp,
+                                .port = application::kDefaultNetworkPort,
+                            };
+                        }
+                        break;
+                    }
+
+                    if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
+                        running_ = false;
+                        return std::nullopt;
+                    }
+                    if (event.key.scancode == SDL_SCANCODE_1) {
+                        return application::LaunchOptions {.mode = application::GameMode::Test};
+                    }
+                    if (event.key.scancode == SDL_SCANCODE_2) {
+                        return application::LaunchOptions {
+                            .mode = application::GameMode::MultiplayerHost,
+                            .port = application::kDefaultNetworkPort,
+                        };
+                    }
+                    if (event.key.scancode == SDL_SCANCODE_3) {
+                        editingIp = true;
+                        setTextInput(true);
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        drawStartupMenu(editingIp, hostIp);
+        SDL_Delay(16);
+    }
+
+    setTextInput(false);
+    return std::nullopt;
+}
+
 void SdlApp::triggerBulletTrail()
 {
     bulletTrailStartTicks_ = SDL_GetTicks();
@@ -218,6 +332,39 @@ void SdlApp::updateMovementKeys(const SDL_Scancode scancode, const bool pressed)
         default:
             break;
     }
+}
+
+void SdlApp::drawStartupMenu(const bool editingIp, const std::string_view hostIp)
+{
+    if (renderer_ == nullptr) {
+        return;
+    }
+
+    drawBackground();
+
+    setColor(renderer_, 255, 255, 255);
+    SDL_RenderDebugText(renderer_, 96.0F, 96.0F, "BAUMAN DOOMLIKE");
+    SDL_RenderDebugText(renderer_, 96.0F, 132.0F, "Select start mode:");
+    SDL_RenderDebugText(renderer_, 112.0F, 172.0F, "1  Test mode");
+    SDL_RenderDebugText(renderer_, 112.0F, 196.0F, "2  Multiplayer: host LAN game");
+    SDL_RenderDebugText(renderer_, 112.0F, 220.0F, "3  Multiplayer: connect by host IP");
+
+    if (editingIp) {
+        SDL_RenderDebugTextFormat(renderer_, 112.0F, 276.0F, "Host IP: %s_", std::string(hostIp).c_str());
+        SDL_RenderDebugText(renderer_, 112.0F, 300.0F, "Enter connects, Backspace edits, Esc returns.");
+    } else {
+        SDL_RenderDebugTextFormat(
+            renderer_,
+            112.0F,
+            276.0F,
+            "LAN port: %u",
+            static_cast<unsigned>(application::kDefaultNetworkPort)
+        );
+        SDL_RenderDebugText(renderer_, 112.0F, 300.0F, "Host: choose 2. Client: choose 3 and type host LAN IP.");
+        SDL_RenderDebugText(renderer_, 112.0F, 324.0F, "Esc quits.");
+    }
+
+    SDL_RenderPresent(renderer_);
 }
 
 bool SdlApp::loadEnemyTexture()
@@ -657,7 +804,7 @@ void SdlApp::drawHud(const domain::World& world, const domain::PlayerId viewerId
 
     switch (world.phase()) {
         case domain::MatchPhase::Running:
-            SDL_RenderDebugText(renderer_, 16.0F, 52.0F, "Mode: offline combat demo");
+            SDL_RenderDebugTextFormat(renderer_, 16.0F, 52.0F, "Mode: %s", hudModeLabel_.c_str());
             break;
         case domain::MatchPhase::GameOver:
             if (world.winner().has_value() && world.winner().value() == viewerId) {
