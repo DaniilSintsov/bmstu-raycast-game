@@ -69,6 +69,7 @@ bool EnetHost::sendToPeer(const std::span<const std::byte> bytes, const bool rel
         return false;
     }
 
+    enet_host_flush(host_);
     return true;
 }
 
@@ -85,6 +86,7 @@ bool EnetHost::broadcastBytes(const std::span<const std::byte> bytes, const bool
     }
 
     enet_host_broadcast(host_, channel, packet);
+    enet_host_flush(host_);
     return true;
 }
 

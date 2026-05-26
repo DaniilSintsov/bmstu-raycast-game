@@ -23,6 +23,12 @@ void GameSession::startOfflineDemo()
     world_.setPhase(domain::MatchPhase::Running);
 }
 
+void GameSession::startWaitingForPlayers()
+{
+    world_.resetForNewRound();
+    world_.setPhase(domain::MatchPhase::WaitingForPlayers);
+}
+
 void GameSession::restart()
 {
     if (!loadedMapPath_.empty()) {
@@ -30,6 +36,11 @@ void GameSession::restart()
     }
     world_.resetForNewRound();
     world_.setPhase(domain::MatchPhase::Running);
+}
+
+void GameSession::setLocalPlayerId(const domain::PlayerId playerId) noexcept
+{
+    localPlayerId_ = playerId;
 }
 
 void GameSession::update(const float deltaSeconds, const InputState& input)
@@ -49,10 +60,44 @@ void GameSession::update(const float deltaSeconds, const InputState& input)
         return;
     }
 
-    updateMovement(deltaSeconds, input);
+    updateMovement(deltaSeconds, localPlayerId_, input);
 
     if (input.shootPressed) {
-        handleShoot();
+        handleShoot(localPlayerId_);
+    }
+
+    world_.advanceTick();
+}
+
+void GameSession::updateAuthoritative(
+    const float deltaSeconds,
+    const InputState& hostInput,
+    const InputState& clientInput
+)
+{
+    shotFiredThisFrame_ = false;
+    damageDealtThisFrame_ = 0;
+    updateWeaponCooldown(deltaSeconds);
+
+    if (world_.phase() == domain::MatchPhase::GameOver) {
+        if (hostInput.restartPressed || clientInput.restartPressed) {
+            restart();
+        }
+        return;
+    }
+
+    if (world_.phase() != domain::MatchPhase::Running) {
+        return;
+    }
+
+    updateMovement(deltaSeconds, domain::PlayerId::Host, hostInput);
+    updateMovement(deltaSeconds, domain::PlayerId::Client, clientInput);
+
+    if (hostInput.shootPressed) {
+        handleShoot(domain::PlayerId::Host);
+    }
+    if (clientInput.shootPressed) {
+        handleShoot(domain::PlayerId::Client);
     }
 
     world_.advanceTick();
@@ -83,9 +128,9 @@ int GameSession::damageDealtThisFrame() const noexcept
     return damageDealtThisFrame_;
 }
 
-void GameSession::updateMovement(const float deltaSeconds, const InputState& input)
+void GameSession::updateMovement(const float deltaSeconds, const domain::PlayerId playerId, const InputState& input)
 {
-    domain::PlayerState& player = world_.player(localPlayerId_);
+    domain::PlayerState& player = world_.player(playerId);
     if (!player.alive) {
         return;
     }
@@ -129,19 +174,25 @@ void GameSession::updateWeaponCooldown(const float deltaSeconds)
     }
 }
 
-void GameSession::handleShoot()
+void GameSession::handleShoot(const domain::PlayerId shooterId)
 {
-    domain::PlayerState& shooter = world_.player(localPlayerId_);
+    domain::PlayerState& shooter = world_.player(shooterId);
     if (shooter.weapon.cooldownRemaining > 0.0F || !shooter.alive) {
         return;
     }
 
     shooter.weapon.cooldownRemaining = shooter.weapon.cooldownSeconds;
-    shotFiredThisFrame_ = true;
+    const bool localShot = shooterId == localPlayerId_;
+    if (localShot) {
+        shotFiredThisFrame_ = true;
+    }
 
-    if (const auto result = domain::ShootingSystem::fireHitscan(world_, localPlayerId_)) {
-        damageDealtThisFrame_ = shooter.weapon.damage;
-        domain::DamageSystem::applyDamage(world_, result->target, damageDealtThisFrame_);
+    if (const auto result = domain::ShootingSystem::fireHitscan(world_, shooterId)) {
+        const int damage = shooter.weapon.damage;
+        if (localShot) {
+            damageDealtThisFrame_ = damage;
+        }
+        domain::DamageSystem::applyDamage(world_, result->target, damage);
     }
 }
 

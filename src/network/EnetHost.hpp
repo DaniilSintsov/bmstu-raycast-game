@@ -2,16 +2,14 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <span>
 
 #include <enet/enet.h>
 
+#include "network/PacketCallback.hpp"
 #include "network/PacketSerializer.hpp"
 
 namespace doomlike::network {
-
-using PacketCallback = std::function<void(MessageType, std::span<const std::byte>)>;
 
 class EnetHost {
 public:

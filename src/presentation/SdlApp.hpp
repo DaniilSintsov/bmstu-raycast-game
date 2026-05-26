@@ -1,12 +1,15 @@
 #pragma once
 
 #include <array>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
 #include <SDL3/SDL.h>
 
 #include "application/InputState.hpp"
+#include "application/LaunchOptions.hpp"
 #include "domain/World.hpp"
 #include "presentation/Raycaster.hpp"
 
@@ -20,6 +23,8 @@ public:
     bool initialize(std::string_view title, int width = 1280, int height = 720);
     void shutdown();
 
+    void setHudModeLabel(std::string label);
+    [[nodiscard]] std::optional<application::LaunchOptions> runStartupMenu();
     [[nodiscard]] application::InputState pollInput();
     void triggerBulletTrail();
     void triggerDamageNumber(int amount);
@@ -29,6 +34,7 @@ public:
 
 private:
     void updateMovementKeys(SDL_Scancode scancode, bool pressed);
+    void drawStartupMenu(bool editingIp, std::string_view hostIp);
     [[nodiscard]] bool loadEnemyTexture();
     [[nodiscard]] bool loadWeaponTexture();
     void drawBackground();
@@ -68,6 +74,7 @@ private:
     Uint64 damageNumberStartTicks_ {0};
     Uint64 damageNumberDurationTicks_ {760};
     int damageNumberAmount_ {0};
+    std::string hudModeLabel_ {"test mode"};
 
     bool moveForwardHeld_ {false};
     bool moveBackwardHeld_ {false};
